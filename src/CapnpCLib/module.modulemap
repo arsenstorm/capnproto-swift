@@ -1,0 +1,5 @@
+module CapnpCLib [system] {
+  header "capnp_c.h"
+  link "Capnp"
+  export *
+}
