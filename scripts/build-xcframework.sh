@@ -7,10 +7,11 @@ ARTIFACTS_DIR="$ROOT_DIR/Artifacts"
 XCFRAMEWORK_PATH="$ARTIFACTS_DIR/Capnp.xcframework"
 
 BUILD_TYPE="Release"
+MACOSX_DEPLOYMENT_TARGET="12.0"
 
 usage() {
   cat <<USAGE
-Usage: $(basename "$0") [--build-type <type>]
+Usage: $(basename "$0") [--build-type <type>] [--macosx-target <version>]
 
 Builds a multi-platform Capnp.xcframework (macOS/iOS + simulators).
 USAGE
@@ -20,6 +21,8 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --build-type)
       BUILD_TYPE="$2"; shift 2 ;;
+    --macosx-target)
+      MACOSX_DEPLOYMENT_TARGET="$2"; shift 2 ;;
     -h|--help)
       usage; exit 0 ;;
     *)
@@ -38,10 +41,16 @@ build_sdk() {
   local sdk_path
   sdk_path=$(xcrun --sdk "$sdk" --show-sdk-path)
 
+  local deployment_target=""
+  if [[ "$sdk" == "macosx" ]]; then
+    deployment_target="-DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET}"
+  fi
+
   cmake -S "$ROOT_DIR" -B "$build_dir" \
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
     -DCMAKE_OSX_SYSROOT="$sdk_path" \
-    -DCMAKE_OSX_ARCHITECTURES="$archs" >&2
+    -DCMAKE_OSX_ARCHITECTURES="$archs" \
+    $deployment_target >&2
 
   cmake --build "$build_dir" --config "$BUILD_TYPE" >&2
 

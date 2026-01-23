@@ -20,5 +20,10 @@ let package = Package(
             dependencies: ["CapnpCLib"],
             path: "src/Capnp"
         ),
+        .testTarget(
+            name: "CapnpTests",
+            dependencies: ["Capnp"],
+            path: "tests/CapnpTests"
+        ),
     ]
 )
