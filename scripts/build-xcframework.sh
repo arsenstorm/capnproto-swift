@@ -89,11 +89,37 @@ LIB_IOS=$(build_sdk iphoneos "arm64")
 LIB_IOSSIM=$(build_sdk iphonesimulator "arm64;x86_64")
 
 # Headers + modulemap for the xcframework.
+#
+# We bundle three header surfaces:
+#   1. `capnp_c.h` + `module.modulemap` — the minimal C API exposed as the
+#      `CapnpCLib` Swift module (the Swift wrapper layer in `src/Capnp` calls
+#      these C functions).
+#   2. The upstream Cap'n Proto C++ public headers under `capnp/` and `kj/`.
+#      These are consumed by downstream C++ shims that integrate generated
+#      `.capnp.c++` code (e.g. Kayle ID's `verify_capnp_c.cpp`). They are NOT
+#      part of the Swift module — they are public headers reached via
+#      `#include "capnp/message.h"` from C++/Objective-C++ sources.
+#
+# Bundling the upstream headers means consumers no longer need bespoke
+# HEADER_SEARCH_PATHS pointing into a checkout of this package's source tree.
 HEADERS_DIR="$BUILD_ROOT/headers"
 rm -rf "$HEADERS_DIR"
-mkdir -p "$HEADERS_DIR"
+mkdir -p "$HEADERS_DIR/capnp" "$HEADERS_DIR/kj"
 cp "$ROOT_DIR/src/CapnpCLib/include/capnp_c.h" "$HEADERS_DIR/"
 cp "$ROOT_DIR/src/CapnpCLib/module.modulemap" "$HEADERS_DIR/"
+find "$ROOT_DIR/capnproto/c++/src/capnp" -maxdepth 1 -name "*.h" -exec cp {} "$HEADERS_DIR/capnp/" \;
+find "$ROOT_DIR/capnproto/c++/src/kj" -maxdepth 1 -name "*.h" -exec cp {} "$HEADERS_DIR/kj/" \;
+# Cap'n Proto and KJ have a few sub-namespaced header dirs (compat/, parse/,
+# ...). Mirror their layout under Headers/ so existing `#include` paths keep
+# working unchanged.
+for sub_dir in "$ROOT_DIR/capnproto/c++/src/capnp"/*/ "$ROOT_DIR/capnproto/c++/src/kj"/*/; do
+  if [[ -d "$sub_dir" ]]; then
+    rel="${sub_dir#"$ROOT_DIR/capnproto/c++/src/"}"
+    rel="${rel%/}"
+    mkdir -p "$HEADERS_DIR/$rel"
+    find "$sub_dir" -maxdepth 1 -name "*.h" -exec cp {} "$HEADERS_DIR/$rel/" \;
+  fi
+done
 
 rm -rf "$XCFRAMEWORK_PATH"
 
